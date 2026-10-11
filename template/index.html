@@ -1,0 +1,2127 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TakeoutRoulette - Local Takeout Hunter</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              400: '#fb923c',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c',
+              900: '#7c2d12',
+            }
+          },
+          animation: {
+            'spin-slow': 'spin 12s linear infinite',
+            'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
+            'bounce-subtle': 'bounceSubtle 1.5s ease-in-out infinite',
+          },
+          keyframes: {
+            pulseGlow: {
+              '0%, 100%': { boxShadow: '0 0 15px rgba(249, 115, 22, 0.4)' },
+              '50%': { boxShadow: '0 0 30px rgba(249, 115, 22, 0.85)' }
+            },
+            bounceSubtle: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-6px)' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <!-- QRCode.js -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* Glassmorphism */
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card-hover:hover {
+      background: rgba(30, 41, 59, 0.85);
+      border-color: rgba(249, 115, 22, 0.4);
+    }
+
+    /* Leaflet popup styling in dark mode */
+    .leaflet-popup-content-wrapper {
+      background: #0f172a !important;
+      color: #f1f5f9 !important;
+      border: 1px solid #334155 !important;
+      border-radius: 0.75rem !important;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
+    }
+    .leaflet-popup-tip {
+      background: #0f172a !important;
+    }
+    .leaflet-container {
+      background: #090d16 !important;
+      font-family: inherit !important;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased overflow-x-hidden selection:bg-brand-500 selection:text-white">
+
+  <!-- ================= TOP HEADER ================= -->
+  <header class="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-13 sm:h-16 flex items-center justify-between gap-2">
+      
+      <!-- Brand & Tagline -->
+      <div class="flex items-center space-x-2 sm:space-x-3 min-w-0">
+        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-brand-500 to-amber-600 flex items-center justify-center shadow-lg shadow-brand-500/20 text-lg sm:text-2xl shrink-0">
+          🍱
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center space-x-1.5 sm:space-x-2">
+            <span class="text-base sm:text-xl font-extrabold tracking-tight bg-gradient-to-r from-orange-400 via-amber-300 to-yellow-400 bg-clip-text text-transparent truncate">
+              TakeoutRoulette
+            </span>
+            <span id="headerSubtitle" class="hidden sm:inline-block text-xs px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-400 font-semibold border border-brand-500/30 whitespace-nowrap">
+              Takeout Hunter
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden md:block">
+            Break the supermarket bento routine! Discover fresh takeout open right now near you.
+          </p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs & Actions -->
+      <div class="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
+        <!-- Live Clock & Status Badge -->
+        <div id="clockBadge" class="hidden lg:flex items-center space-x-2 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700 text-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="currentTimeDisplay" class="font-mono text-slate-300 font-medium">--:-- JST</span>
+        </div>
+
+        <!-- Station Location Selector -->
+        <div class="relative">
+          <select id="stationSelector" class="bg-slate-800 text-slate-200 border border-slate-700 text-xs sm:text-sm rounded-lg px-2 py-1 sm:px-2.5 sm:py-1.5 max-w-[130px] sm:max-w-none truncate focus:ring-2 focus:ring-brand-500 focus:outline-none">
+            <option value="station" selected>📍 Local Station</option>
+          </select>
+        </div>
+
+        <!-- Audio Mute Toggle -->
+        <button id="soundToggleBtn" title="Toggle sound effects" class="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition text-xs sm:text-sm">
+          <span id="soundIcon">🔊</span>
+        </button>
+
+        <!-- Sync / Data Backup -->
+        <button id="openSyncModalBtn" title="Data Backup & Cross-Device Sync" class="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-brand-400 transition text-xs sm:text-sm">
+          🔄
+        </button>
+
+        <!-- Lock Vault Button (Visible when encrypted session active) -->
+        <button id="lockVaultBtn" title="Lock vault & clear saved session" class="hidden px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 border border-slate-700 hover:border-rose-700/60 text-slate-300 hover:text-rose-300 text-xs font-semibold items-center space-x-1 transition">
+          <span>🔒</span>
+          <span class="hidden sm:inline">Lock</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sub-Nav Tab Bar -->
+    <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 border-t border-slate-800/60 flex space-x-1 sm:space-x-4 text-xs sm:text-sm overflow-x-auto py-1 scrollbar-none">
+      <button data-tab="roulette" class="tab-btn active px-2.5 py-1.5 font-medium rounded-lg text-brand-400 bg-brand-500/10 flex items-center space-x-1.5 transition shrink-0">
+        <span>🎰</span>
+        <span class="whitespace-nowrap"><span class="hidden sm:inline">Takeout </span>Roulette</span>
+      </button>
+      <button data-tab="explore" class="tab-btn px-2.5 py-1.5 font-medium rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 flex items-center space-x-1.5 transition shrink-0">
+        <span>🗺️</span>
+        <span class="whitespace-nowrap">Map<span class="hidden sm:inline"> & Explorer</span></span>
+        <span id="tabCountBadge" class="text-[10px] sm:text-xs px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 ml-1">0</span>
+      </button>
+      <button data-tab="history" class="tab-btn px-2.5 py-1.5 font-medium rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 flex items-center space-x-1.5 transition shrink-0">
+        <span>📜</span>
+        <span class="whitespace-nowrap">History<span class="hidden sm:inline"> & Favorites</span></span>
+        <span id="historyCountBadge" class="text-[10px] sm:text-xs px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 ml-1">0</span>
+      </button>
+      <button data-tab="settings" class="tab-btn px-2.5 py-1.5 font-medium rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 flex items-center space-x-1.5 transition shrink-0">
+        <span>⚙️</span>
+        <span class="whitespace-nowrap">Settings<span class="hidden sm:inline"> & Odds</span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTENT CONTAINER ================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- 🟢 SUPERMARKET STANDBY CALLOUT BANNER -->
+    <div id="lifeNoticeBanner" class="p-4 rounded-xl glass-card border border-emerald-500/30 flex items-start sm:items-center justify-between gap-4 text-xs sm:text-sm">
+      <div class="flex items-center space-x-3">
+        <span class="text-2xl p-2 rounded-lg bg-emerald-500/20 text-emerald-400">🛒</span>
+        <div>
+          <span class="font-semibold text-emerald-300" id="supermarketNoticeTitle">Grocery Bento Standby</span>
+          <p class="text-slate-400 mt-0.5">Ready to graduate from supermarket bentos? Discover fresh, hot takeout open right now near you tonight!</p>
+        </div>
+      </div>
+      <button onclick="document.getElementById('lifeNoticeBanner').remove()" class="text-slate-500 hover:text-slate-300 text-lg leading-none">&times;</button>
+    </div>
+
+    <!-- ================= TAB 1: ROULETTE (MAIN HERO) ================= -->
+    <section id="tab-roulette" class="tab-pane block space-y-6">
+      
+      <!-- Roulette Grid: Controls (Left) & Roulette Arena (Right) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- LEFT: Filters & Constraints (4 Cols, placed below roulette on mobile) -->
+        <div class="lg:col-span-4 space-y-4 order-2 lg:order-1">
+          <div class="glass-card rounded-2xl p-5 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h2 class="font-bold text-base flex items-center space-x-2 text-slate-100">
+                <span>🎯</span>
+                <span>Filters & Criteria</span>
+              </h2>
+              <span id="eligiblePoolCount" class="text-xs px-2.5 py-1 rounded-full bg-brand-500/20 text-brand-400 font-semibold border border-brand-500/30">
+                Eligible: 0 spots
+              </span>
+            </div>
+
+            <!-- Mandatory Rules -->
+            <div class="space-y-3">
+              <!-- Open Now Toggle -->
+              <label class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
+                <div class="flex items-center space-x-2.5">
+                  <span class="text-emerald-400 text-base">🟢</span>
+                  <div>
+                    <div class="font-semibold text-xs sm:text-sm text-slate-200">Open Right Now Only</div>
+                    <div class="text-[11px] text-slate-400">Live check against current time and last order calls</div>
+                  </div>
+                </div>
+                <input type="checkbox" id="filterOpenNow" checked class="w-4 h-4 rounded text-brand-500 bg-slate-800 border-slate-700 focus:ring-brand-500">
+              </label>
+
+              <!-- Exclude Ordered Toggle -->
+              <label class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
+                <div class="flex items-center space-x-2.5">
+                  <span class="text-amber-400 text-base">🚫</span>
+                  <div>
+                    <div class="font-semibold text-xs sm:text-sm text-slate-200">Unvisited Spots Only (Skip Repeats)</div>
+                    <div class="text-[11px] text-slate-400">Automatically skips places you already ordered from</div>
+                  </div>
+                </div>
+                <input type="checkbox" id="filterExcludeOrdered" checked class="w-4 h-4 rounded text-brand-500 bg-slate-800 border-slate-700 focus:ring-brand-500">
+              </label>
+            </div>
+
+            <!-- Soft Filters -->
+            <div class="space-y-3 pt-2 border-t border-slate-800/80 text-xs sm:text-sm">
+              <!-- Distance from Station -->
+              <div>
+                <div class="flex justify-between text-xs text-slate-300 font-medium mb-1">
+                  <span>Walking Distance from Station</span>
+                  <span id="distDisplay" class="text-brand-400 font-semibold">Within 800m (~10 min walk)</span>
+                </div>
+                <input type="range" id="filterMaxDistance" min="200" max="1500" step="50" value="800" class="w-full accent-brand-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
+                <div class="flex justify-between text-[10px] text-slate-500 mt-0.5">
+                  <span>200m (Direct)</span>
+                  <span>500m</span>
+                  <span>1.0km</span>
+                  <span>1.5km</span>
+                </div>
+              </div>
+
+              <!-- Rating Filter -->
+              <div>
+                <label class="block text-xs text-slate-300 font-medium mb-1">Minimum Tabelog Rating</label>
+                <select id="filterMinRating" class="w-full bg-slate-900 text-slate-200 border border-slate-800 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-brand-500 text-xs sm:text-sm">
+                  <option value="0">No minimum (All restaurants)</option>
+                  <option value="3.1">⭐ 3.10+ (Solid & tasty)</option>
+                  <option value="3.2" selected>⭐ 3.20+ (Locally recommended)</option>
+                  <option value="3.4">⭐ 3.40+ (Competitive favorite)</option>
+                  <option value="3.5">⭐ 3.50+ (Top 3% elite tier)</option>
+                </select>
+              </div>
+
+              <!-- Cuisine Genre Filter -->
+              <div>
+                <label class="block text-xs text-slate-300 font-medium mb-1">Cuisine Genre</label>
+                <select id="filterCuisine" class="w-full bg-slate-900 text-slate-200 border border-slate-800 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-brand-500 text-xs sm:text-sm">
+                  <option value="all">All Cuisines (Surprise me)</option>
+                  <option value="bento">🍱 Bento & Delicatessen</option>
+                  <option value="ramen_noodles">🍜 Ramen, Tsukemen & Noodles</option>
+                  <option value="meat_bbq">🥩 Grilled Meat, Steaks & Donburi</option>
+                  <option value="yakitori_izakaya">🍢 Yakitori & Izakaya Takeout</option>
+                  <option value="curry">🍛 Curry (Indian, Japanese & Spice)</option>
+                  <option value="chinese">🥟 Chinese, Dim Sum & Gyoza</option>
+                  <option value="western_italian">🍕 Western, Italian & Pizza</option>
+                  <option value="sushi">🍣 Sushi & Fresh Seafood</option>
+                  <option value="japanese">🥢 Traditional Japanese & Unagi</option>
+                </select>
+              </div>
+
+              <!-- Budget Filter (Night Dinner Price) -->
+              <div>
+                <label class="block text-xs text-slate-300 font-medium mb-1 flex items-center justify-between">
+                  <span>Night Dinner Budget</span>
+                  <span class="text-[10px] text-brand-400 font-normal">Excludes luxury sit-down</span>
+                </label>
+                <select id="filterBudget" class="w-full bg-slate-900 text-slate-200 border border-slate-800 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-brand-500 text-xs sm:text-sm">
+                  <option value="4000" selected>🌙 Under ¥4,000 (Realistic Takeout Cap)</option>
+                  <option value="2000">🌙 Under ¥2,000 (Casual Weeknight Dinner)</option>
+                  <option value="1500">🌙 Under ¥1,500 (Budget Takeout & Bowls)</option>
+                  <option value="1000">🌙 Under ¥1,000 (Supermarket Bento Alternative)</option>
+                  <option value="6000">🌙 Under ¥6,000 (Occasional Splurge)</option>
+                  <option value="all">🌙 Any Budget (Includes Luxury ¥10k+)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Simulated Time Travel Mode -->
+            <div class="pt-3 border-t border-slate-800 text-xs space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400 font-medium">🕒 Simulate Departure Time</span>
+                <button id="resetTimeBtn" class="text-brand-400 hover:underline text-[11px]">Reset to Now</button>
+              </div>
+              <input type="time" id="simulatedTimeInput" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-200">
+              <p class="text-[10px] text-slate-500">Test scenarios like: "What is open if I leave the office at 21:30?"</p>
+            </div>
+
+            <!-- View Pool Button -->
+            <button id="viewPoolBtn" class="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold flex items-center justify-center space-x-2 transition">
+              <span>📊</span>
+              <span>View Eligible Pool & Winning Odds</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- RIGHT: Interactive Roulette Arena & Winner Card (8 Cols, placed top on mobile) -->
+        <div class="lg:col-span-8 space-y-6 order-1 lg:order-2">
+          
+          <!-- SPIN STAGE CONTAINER -->
+          <div class="glass-card rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center relative overflow-hidden text-center min-h-[380px] border border-brand-500/20 shadow-2xl shadow-brand-500/10">
+            
+            <!-- Background Decorative Ambient Glow -->
+            <div class="absolute -top-32 -left-32 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-32 -right-32 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <!-- MODE SWITCHER: Slot Reel vs Wheel -->
+            <div class="absolute top-4 right-4 flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-xs">
+              <button id="modeSlotBtn" class="px-2.5 py-1 rounded-lg bg-brand-500 text-white font-semibold transition">🎰 Slot Reel</button>
+              <button id="modeWheelBtn" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition">🎡 Wheel</button>
+            </div>
+
+            <!-- Visual Slot Reel Container -->
+            <div id="slotStage" class="w-full max-w-md my-4">
+              <div class="relative py-6 px-4 rounded-2xl bg-gradient-to-b from-slate-900 via-slate-850 to-slate-900 border-2 border-slate-700/80 shadow-inner overflow-hidden">
+                <!-- Slot Selector Frame -->
+                <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-24 border-y-2 border-brand-500/60 bg-brand-500/5 pointer-events-none z-10 flex items-center justify-between px-3">
+                  <span class="text-brand-400 text-xl font-bold animate-pulse">▶</span>
+                  <span class="text-brand-400 text-xl font-bold animate-pulse">◀</span>
+                </div>
+
+                <!-- Active Reel Element -->
+                <div id="reelCarousel" class="h-32 flex flex-col items-center justify-center space-y-2 select-none">
+                  <div class="text-4xl animate-bounce-subtle">🎲</div>
+                  <div class="text-lg font-bold text-slate-200" id="reelRestaurantName">Roulette Ready...</div>
+                  <div class="text-xs text-slate-400" id="reelRestaurantSub">Hit the button below to decide tonight's dinner!</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Visual Canvas Wheel (Alternate Mode) -->
+            <div id="wheelStage" class="hidden w-full max-w-sm my-4 flex-col items-center">
+              <div class="relative w-64 h-64 sm:w-72 sm:h-72">
+                <canvas id="wheelCanvas" width="300" height="300" class="w-full h-full"></canvas>
+                <!-- Center Pointer -->
+                <div class="absolute top-0 left-1/2 -translate-x-1/2 -mt-2 z-20 text-brand-400 text-2xl font-black drop-shadow-md">
+                  ▼
+                </div>
+              </div>
+            </div>
+
+            <!-- Big Spin Button -->
+            <div class="mt-4 flex flex-col items-center space-y-2 z-20">
+              <button id="spinBtn" class="group relative px-8 py-4 rounded-2xl bg-gradient-to-r from-brand-600 via-amber-500 to-orange-500 text-white font-extrabold text-lg sm:text-xl shadow-xl shadow-brand-500/30 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer animate-pulse-glow flex items-center space-x-3">
+                <span class="text-2xl group-hover:rotate-45 transition transform">🎲</span>
+                <span>SPIN THE ROULETTE!</span>
+              </button>
+              <div class="text-xs text-slate-400 flex items-center space-x-2">
+                <span>* Closer, higher-rated, and currently open spots have higher odds</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- WINNER RESTAURANT CARD (Revealed on win) -->
+          <div id="winnerCardContainer" class="hidden transition-all duration-500 transform translate-y-4">
+            <div class="glass-card rounded-2xl p-6 sm:p-7 border-2 border-brand-500 bg-slate-900/90 shadow-2xl relative overflow-hidden">
+              
+              <!-- Winner Banner Badge -->
+              <div class="absolute top-0 right-0 bg-gradient-to-l from-amber-500 to-brand-500 text-slate-950 font-black text-xs px-5 py-1.5 rounded-bl-xl shadow-md uppercase tracking-wider flex items-center space-x-1">
+                <span>🎉</span>
+                <span>Tonight's Takeout Winner!</span>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                <!-- Photo -->
+                <div class="md:col-span-4 relative rounded-xl overflow-hidden aspect-video md:aspect-square bg-slate-800 border border-slate-700">
+                  <img id="winnerImage" src="" alt="Restaurant" class="w-full h-full object-cover">
+                  <div id="winnerImageFallback" class="hidden w-full h-full flex flex-col items-center justify-center text-4xl bg-slate-800 text-slate-500">
+                    🍱
+                  </div>
+                  <div id="winnerOpenBadge" class="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-md bg-emerald-500/80 text-white shadow">
+                    🟢 Open Now
+                  </div>
+                </div>
+
+                <!-- Info Details -->
+                <div class="md:col-span-8 space-y-3 text-left">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span id="winnerGenreBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-brand-300 font-semibold border border-slate-700">
+                      Cuisine
+                    </span>
+                    <span id="winnerDistBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-sky-300 font-medium">
+                      🚶 ~5 min walk from Station (400m)
+                    </span>
+                    <span id="winnerRatingBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                      ⭐ 3.50
+                    </span>
+                  </div>
+
+                  <h3 id="winnerName" class="text-xl sm:text-2xl font-black text-white hover:text-brand-400 transition">
+                    Loading restaurant name...
+                  </h3>
+
+                  <div class="text-xs text-slate-300 space-y-1">
+                    <p id="winnerHoursText" class="flex items-center space-x-2">
+                      <span class="text-slate-400">🕒 Hours:</span>
+                      <span class="font-medium text-slate-200">11:00 - 15:00 / 17:00 - 22:00</span>
+                    </p>
+                    <p id="winnerAddressText" class="flex items-center space-x-2 truncate">
+                      <span class="text-slate-400">📍 Address:</span>
+                      <span class="font-medium text-slate-200 truncate">Tokyo Minato-ku</span>
+                    </p>
+                    <p id="winnerBudgetText" class="flex items-center space-x-2">
+                      <span class="text-slate-400">💰 Budget:</span>
+                      <span class="font-medium text-slate-200">￥1,000～￥2,000</span>
+                    </p>
+                  </div>
+
+                  <!-- External Order, Social & Map Links -->
+                  <div class="pt-2 flex flex-wrap gap-2 text-xs">
+                    <!-- Official Website (if available) -->
+                    <a id="winnerWebsiteLink" href="#" target="_blank" rel="noopener" class="hidden px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium items-center space-x-1.5 transition shadow">
+                      <span>🌐</span>
+                      <span>Official Website</span>
+                    </a>
+
+                    <!-- Dynamic Official SNS Container (Instagram, X, Facebook, etc.) -->
+                    <div id="winnerSnsContainer" class="flex flex-wrap gap-2"></div>
+
+                    <!-- Direct Phone Call Button -->
+                    <a id="winnerPhoneLink" href="#" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium flex items-center space-x-1.5 transition border border-emerald-500 shadow">
+                      <span>📞</span>
+                      <span id="winnerPhoneText">Call Restaurant</span>
+                    </a>
+
+                    <!-- Google Maps Walking Route (in English) -->
+                    <a id="winnerMapLink" href="#" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium flex items-center space-x-1.5 transition shadow">
+                      <span>🗺️</span>
+                      <span>Google Maps (Walking Route)</span>
+                    </a>
+
+                    <!-- Tabelog Detail Page -->
+                    <a id="winnerTabelogLink" href="#" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium flex items-center space-x-1.5 transition shadow">
+                      <span>📖</span>
+                      <span>Tabelog Page</span>
+                    </a>
+
+                    <!-- Uber Eats (Search Pickup) -->
+                    <a id="winnerUberLink" href="#" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium flex items-center space-x-1.5 transition border border-slate-700">
+                      <span>🛵</span>
+                      <span>Uber Eats Pickup</span>
+                    </a>
+                  </div>
+
+                  <!-- In-App Action Buttons -->
+                  <div class="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center space-x-2">
+                      <button id="markOrderedBtn" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center space-x-1.5">
+                        <span>✅</span>
+                        <span>I'm Ordering Here Tonight! (Save to History)</span>
+                      </button>
+                      <button id="favWinnerBtn" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 border border-slate-700 text-sm transition" title="Add to favorites">
+                        ⭐
+                      </button>
+                      <button id="blacklistWinnerBtn" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-400 border border-slate-700 text-sm transition" title="Blacklist / Exclude from future spins">
+                        🚫
+                      </button>
+                    </div>
+
+                    <button id="spinAgainBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-brand-400 hover:text-brand-300 font-semibold text-xs border border-slate-700 transition flex items-center space-x-1">
+                      <span>🔄</span>
+                      <span>Spin Again</span>
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ================= TAB 2: EXPLORE & MAP ================= -->
+    <section id="tab-explore" class="tab-pane hidden space-y-6">
+      
+      <!-- Interactive Leaflet Map Container -->
+      <div class="glass-card rounded-2xl overflow-hidden border border-slate-800 relative">
+        <div class="p-3 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div class="flex items-center space-x-3">
+            <span class="font-bold text-slate-200 flex items-center space-x-1">
+              <span>🗺️</span>
+              <span>Takeout Map</span>
+            </span>
+            <span class="text-slate-400">Walking circles: 300m / 500m / 800m radius</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">🛒 Supermarket Standby</span>
+            <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">⭐ 3.5+ Top Tier</span>
+            <span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-medium">📍 Station</span>
+          </div>
+        </div>
+        <div id="leafletMap" class="w-full h-80 sm:h-96 z-10"></div>
+      </div>
+
+      <!-- Restaurant Card Grid Header & Controls -->
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div class="flex items-center space-x-3">
+          <h2 class="font-bold text-lg text-slate-100 flex items-center space-x-2">
+            <span>🍱</span>
+            <span>All Discovered Takeout Spots</span>
+          </h2>
+          <span id="gridTotalCount" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300">
+            0 spots
+          </span>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <!-- Search Box -->
+          <input type="text" id="restaurantSearchInput" placeholder="Search by restaurant name or cuisine..." class="bg-slate-900 text-slate-200 border border-slate-800 rounded-lg px-3 py-1.5 text-xs sm:text-sm focus:ring-1 focus:ring-brand-500 focus:outline-none w-56 sm:w-72">
+          
+          <!-- Sort Dropdown -->
+          <select id="gridSortSelect" class="bg-slate-900 text-slate-200 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm focus:outline-none">
+            <option value="score">Selection Odds (Priority)</option>
+            <option value="rating" selected>Tabelog Rating (High to Low)</option>
+            <option value="distance">Distance from Station (Closest)</option>
+            <option value="name">Name (A-Z)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Cards Grid -->
+      <div id="restaurantCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Rendered dynamically by JS -->
+      </div>
+
+    </section>
+
+    <!-- ================= TAB 3: ORDER HISTORY & STATS ================= -->
+    <section id="tab-history" class="tab-pane hidden space-y-6">
+      
+      <!-- Metrics Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="glass-card rounded-2xl p-4 text-center">
+          <div class="text-2xl font-black text-brand-400" id="statTotalOrders">0</div>
+          <div class="text-xs text-slate-400 mt-1">Total Takeout Orders</div>
+        </div>
+        <div class="glass-card rounded-2xl p-4 text-center">
+          <div class="text-2xl font-black text-emerald-400" id="statUniqueRestaurants">0</div>
+          <div class="text-xs text-slate-400 mt-1">Unique Spots Explored</div>
+        </div>
+        <div class="glass-card rounded-2xl p-4 text-center">
+          <div class="text-2xl font-black text-amber-400" id="statLifeEscapes">0</div>
+          <div class="text-xs text-slate-400 mt-1">Supermarket Escapes 🎉</div>
+        </div>
+        <div class="glass-card rounded-2xl p-4 text-center">
+          <div class="text-2xl font-black text-sky-400" id="statFavoriteCount">0</div>
+          <div class="text-xs text-slate-400 mt-1">Favorite Restaurants</div>
+        </div>
+      </div>
+
+      <!-- History List Card -->
+      <div class="glass-card rounded-2xl p-5 sm:p-6 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <h3 class="font-bold text-base text-slate-100 flex items-center space-x-2">
+            <span>📜</span>
+            <span>Your Previous Takeout Orders</span>
+          </h3>
+          <button id="clearHistoryBtn" class="text-xs text-rose-400 hover:text-rose-300 transition">
+            Clear History
+          </button>
+        </div>
+
+        <div id="historyListContainer" class="space-y-3">
+          <!-- Rendered dynamically by JS -->
+          <div class="text-center py-10 text-slate-500 text-sm">
+            No order history yet. Spin the roulette to decide tonight's dinner!
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ================= TAB 4: SETTINGS & ODDS ================= -->
+    <section id="tab-settings" class="tab-pane hidden space-y-6">
+      
+      <div class="max-w-2xl mx-auto space-y-6">
+        
+        <!-- Probability Tuning Card -->
+        <div class="glass-card rounded-2xl p-6 space-y-5">
+          <h3 class="font-bold text-base text-slate-100 flex items-center space-x-2 pb-3 border-b border-slate-800">
+            <span>⚖️</span>
+            <span>Selection Odds & Algorithm Weights</span>
+          </h3>
+
+          <p class="text-xs text-slate-400 leading-relaxed">
+            TakeoutRoulette calculates selection probability using proximity and rating power curves. You can adjust the emphasis using the sliders below.
+          </p>
+
+          <!-- Distance Bias -->
+          <div class="space-y-2">
+            <div class="flex justify-between text-xs text-slate-200">
+              <span class="font-medium">Station Proximity Priority (Closer spots get higher odds)</span>
+              <span id="biasDistanceLabel" class="text-brand-400 font-bold">Balanced (Standard)</span>
+            </div>
+            <input type="range" id="biasDistanceInput" min="0" max="3" step="1" value="1" class="w-full accent-brand-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
+            <div class="flex justify-between text-[10px] text-slate-500">
+              <span>Disabled (Equal)</span>
+              <span>Balanced</span>
+              <span>High (Proximity+)</span>
+              <span>Maximum (Closest First)</span>
+            </div>
+          </div>
+
+          <!-- Rating Bias -->
+          <div class="space-y-2 pt-3 border-t border-slate-800">
+            <div class="flex justify-between text-xs text-slate-200">
+              <span class="font-medium">Tabelog Rating Priority (Higher rated spots get higher odds)</span>
+              <span id="biasRatingLabel" class="text-amber-400 font-bold">Balanced (Standard)</span>
+            </div>
+            <input type="range" id="biasRatingInput" min="0" max="3" step="1" value="1" class="w-full accent-amber-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
+            <div class="flex justify-between text-[10px] text-slate-500">
+              <span>Disabled (Equal)</span>
+              <span>Balanced</span>
+              <span>High (Rating+)</span>
+              <span>Maximum (Gourmet First)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Data Sync & Backup Card -->
+        <div class="glass-card rounded-2xl p-6 space-y-5">
+          <h3 class="font-bold text-base text-slate-100 flex items-center space-x-2 pb-3 border-b border-slate-800">
+            <span>💾</span>
+            <span>Data Storage & Cross-Device Sync (Phone / PC)</span>
+          </h3>
+
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Your order history and favorites are stored privately in your browser's local storage. Use the backup tools below to transfer your data between your phone and computer.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            <button id="exportJsonBtn" class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs flex items-center justify-center space-x-2 transition">
+              <span>📥</span>
+              <span>Save Backup JSON</span>
+            </button>
+            <button id="copyJsonBtn" class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs flex items-center justify-center space-x-2 transition">
+              <span>📋</span>
+              <span>Copy to Clipboard</span>
+            </button>
+            <button id="showQrBtn" class="py-2.5 px-4 rounded-xl bg-brand-600/30 hover:bg-brand-600/50 text-brand-300 border border-brand-500/40 font-semibold text-xs flex items-center justify-center space-x-2 transition">
+              <span>📱</span>
+              <span>Mobile QR Sync</span>
+            </button>
+          </div>
+
+          <div class="pt-3 border-t border-slate-800">
+            <label class="block text-xs font-medium text-slate-300 mb-2">Import & Restore Backup JSON</label>
+            <textarea id="importJsonTextarea" rows="3" placeholder="Paste your exported backup JSON data here..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-300 focus:outline-none focus:ring-1 focus:ring-brand-500"></textarea>
+            <button id="importJsonBtn" class="mt-2 w-full py-2.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs transition flex items-center justify-center space-x-2">
+              <span>📤</span>
+              <span>Restore Data</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ================= MODAL: POOL & ODDS TRANSPARENCY ================= -->
+  <div id="poolModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col border border-slate-800 shadow-2xl">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-base text-slate-100 flex items-center space-x-2">
+          <span>📊</span>
+          <span>Current Eligible Pool & Winning Odds</span>
+        </h3>
+        <button onclick="document.getElementById('poolModal').classList.add('hidden')" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+      </div>
+      <div class="p-4 overflow-y-auto flex-1 space-y-2" id="poolModalList">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: ORDER CONFIRMATION & NOTE ================= -->
+  <div id="orderNoteModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl max-w-md w-full p-6 space-y-4 border border-brand-500/40 shadow-2xl">
+      <h3 class="font-bold text-lg text-slate-100 flex items-center space-x-2">
+        <span>🎉</span>
+        <span>Log Tonight's Order</span>
+      </h3>
+      <p class="text-xs text-slate-400" id="orderModalRestaurantName">
+        Restaurant Name
+      </p>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Rating (Optional)</label>
+          <div class="flex space-x-2 text-xl" id="starRatingSelector">
+            <button type="button" data-star="1" class="text-amber-400">★</button>
+            <button type="button" data-star="2" class="text-amber-400">★</button>
+            <button type="button" data-star="3" class="text-amber-400">★</button>
+            <button type="button" data-star="4" class="text-amber-400">★</button>
+            <button type="button" data-star="5" class="text-amber-400">★</button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Notes & Experience (Optional)</label>
+          <input type="text" id="orderModalNoteInput" placeholder="e.g. Karaage bento was super crispy and generous!" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200">
+        </div>
+      </div>
+      <div class="flex justify-end space-x-2 pt-2">
+        <button id="cancelOrderNoteBtn" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs hover:bg-slate-700">Cancel</button>
+        <button id="saveOrderNoteBtn" class="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs">Save Record</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: QR CODE MOBILE SYNC ================= -->
+  <div id="qrModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl max-w-sm w-full p-6 text-center space-y-4 border border-brand-500/40 shadow-2xl">
+      <h3 class="font-bold text-base text-slate-100 flex items-center justify-center space-x-2">
+        <span>📱</span>
+        <span>Open on Mobile</span>
+      </h3>
+      <p class="text-xs text-slate-400">Scan with your phone's camera to use TakeoutRoulette on the go during your commute.</p>
+      <div class="flex justify-center p-4 bg-white rounded-xl shadow-inner">
+        <canvas id="qrCanvas"></canvas>
+      </div>
+      <button onclick="document.getElementById('qrModal').classList.add('hidden')" class="w-full py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 font-semibold transition">Close</button>
+    </div>
+  </div>
+
+  <!-- ================= VAULT UNLOCK MODAL ================= -->
+  <div id="vaultModal" class="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative text-center border border-brand-500/30">
+      <div class="w-16 h-16 bg-gradient-to-tr from-amber-500/20 to-brand-500/20 border border-brand-500/40 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-brand-500/20 text-3xl">
+        🍱
+      </div>
+      <h2 class="text-xl font-extrabold text-white">TakeoutRoulette</h2>
+      <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">
+        Please enter your passphrase to unlock candidate listings.
+      </p>
+
+      <form id="vaultForm" class="mt-6 space-y-4 text-left">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Passphrase</label>
+          <div class="relative">
+            <input type="password" id="vaultPasswordInput" required autocomplete="current-password" placeholder="Enter passphrase..."
+                   class="w-full bg-slate-950 border border-slate-700 text-sm rounded-xl px-3.5 py-2.5 text-white pr-10 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition">
+            <button type="button" id="vaultTogglePasswordBtn" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs">
+          <label class="flex items-center space-x-2 cursor-pointer select-none text-slate-300">
+            <input type="checkbox" id="vaultRememberCheck" checked class="w-4 h-4 rounded bg-slate-950 border-slate-700 text-brand-500 focus:ring-brand-500">
+            <span>Remember on this device</span>
+          </label>
+        </div>
+
+        <div id="vaultError" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5 flex items-center space-x-2">
+          <span>⚠️</span>
+          <span id="vaultErrorMsg">Incorrect passphrase. Please try again.</span>
+        </div>
+
+        <button type="submit" id="vaultSubmitBtn" class="w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-brand-600/30 flex items-center justify-center space-x-2 cursor-pointer">
+          <span>🔓</span>
+          <span>Unlock TakeoutRoulette</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= EMBEDDED DATA PLACEHOLDERS ================= -->
+  <script>
+    // Embedded dataset injected by python generator, or falls back to fetch
+    window.__ENCRYPTED_PAYLOAD__ = /*__ENCRYPTED_PAYLOAD__*/null;
+    window.__RESTAURANTS_DATA__ = /*__RESTAURANTS_DATA__*/[];
+    window.__STATION_DATA__ = /*__STATION_DATA__*/{};
+  </script>
+
+  <!-- ================= MAIN WEB APPLICATION JAVASCRIPT ================= -->
+  <script>
+    /* =========================================================================
+       AUDIO SYNTHESIZER (Web Audio API - 100% Client-Side, No External MP3s)
+       ========================================================================= */
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      playTick() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(600 + Math.random() * 200, this.ctx.currentTime);
+          gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.04);
+        } catch(e) {}
+      }
+      playFanfare() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+          notes.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.1);
+            gain.gain.setValueAtTime(0.12, this.ctx.currentTime + idx * 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.1 + 0.35);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(this.ctx.currentTime + idx * 0.1);
+            osc.stop(this.ctx.currentTime + idx * 0.1 + 0.4);
+          });
+        } catch(e) {}
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    /* =========================================================================
+       PERSISTENT STATE & STORAGE MANAGER
+       ========================================================================= */
+    const STORAGE_KEY = 'takeout_roulette_state_v1';
+
+    class StorageManager {
+      static loadState() {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          try {
+            return JSON.parse(raw);
+          } catch(e) {}
+        }
+        return {
+          history: [],      // array of { id, name, timestamp, rating, note }
+          favorites: [],    // array of ids
+          blacklist: [],    // array of ids
+          preferences: {
+            open_only: true,
+            exclude_ordered: true,
+            max_dist: 800,
+            min_rating: 3.2,
+            cuisine: 'all',
+            budget: 'all',
+            bias_dist: 1,
+            bias_rating: 1,
+            sound: true
+          }
+        };
+      }
+      static saveState(state) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+    }
+
+    /* =========================================================================
+       REAL-TIME OPENING HOURS EVALUATOR
+       ========================================================================= */
+    class HoursEvaluator {
+      static parseTimeStr(tStr) {
+        if (!tStr) return null;
+        const parts = tStr.split(':');
+        if (parts.length < 2) return null;
+        return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+      }
+
+      static isOpen(restaurant, targetDate = new Date()) {
+        if (restaurant.is_24h) {
+          return { open: true, label: 'Open 24 Hours', minutesLeft: 999 };
+        }
+        if (!restaurant.schedule) {
+          return { open: true, label: 'Hours Unconfirmed', minutesLeft: 999 };
+        }
+
+        const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const dayIdx = targetDate.getDay();
+        const todayKey = dayNames[dayIdx];
+        const yesterdayKey = dayNames[(dayIdx + 6) % 7];
+        const currentMins = targetDate.getHours() * 60 + targetDate.getMinutes();
+
+        // 1. Check yesterday's overnight slot
+        const ySlots = restaurant.schedule[yesterdayKey] || [];
+        for (const slot of ySlots) {
+          if (slot.overnight) {
+            const eMin = this.parseTimeStr(slot.end);
+            if (eMin && currentMins < eMin) {
+              const left = eMin - currentMins;
+              return {
+                open: true,
+                label: `Open Late (Closes ${slot.end} / ${left}m left)`,
+                minutesLeft: left
+              };
+            }
+          }
+        }
+
+        // 2. Check today's slots
+        const tSlots = restaurant.schedule[todayKey] || [];
+        for (const slot of tSlots) {
+          const sMin = this.parseTimeStr(slot.start);
+          const eMin = this.parseTimeStr(slot.end);
+          if (sMin === null || eMin === null) continue;
+
+          if (slot.overnight) {
+            if (currentMins >= sMin) {
+              return {
+                open: true,
+                label: `Open Late (Overnight until ${slot.end})`,
+                minutesLeft: 120
+              };
+            }
+          } else {
+            if (currentMins >= sMin && currentMins < eMin) {
+              const left = eMin - currentMins;
+              return {
+                open: true,
+                label: `Open Now (Closes at ${slot.end} / ${left}m left)`,
+                minutesLeft: left
+              };
+            }
+          }
+        }
+
+        return { open: false, label: 'Closed', minutesLeft: 0 };
+      }
+    }
+
+    /* =========================================================================
+       DATA VAULT DECRYPTION ENGINE
+       ========================================================================= */
+    async function decryptPayloadWebCrypto(passphrase, payload) {
+      const enc = new TextEncoder();
+      const dec = new TextDecoder();
+
+      const keyMaterial = await crypto.subtle.importKey(
+        "raw",
+        enc.encode(passphrase),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
+
+      const salt = Uint8Array.from(atob(payload.salt), c => c.charCodeAt(0));
+      const iv = Uint8Array.from(atob(payload.iv), c => c.charCodeAt(0));
+      const ciphertext = Uint8Array.from(atob(payload.ciphertext), c => c.charCodeAt(0));
+
+      const key = await crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: salt,
+          iterations: 150000,
+          hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["decrypt"]
+      );
+
+      const decryptedBuffer = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        key,
+        ciphertext
+      );
+
+      const jsonStr = dec.decode(decryptedBuffer);
+      return JSON.parse(jsonStr);
+    }
+
+    /* =========================================================================
+       MAIN APPLICATION LOGIC
+       ========================================================================= */
+    class TakeoutApp {
+      constructor() {
+        this.restaurants = [];
+        this.station = window.__STATION_DATA__ || {};
+        this.state = StorageManager.loadState();
+        this.map = null;
+        this.markers = [];
+        this.mapInitialized = false;
+        this.isSpinning = false;
+        this.activeWinner = null;
+        this.spinMode = 'slot'; // 'slot' or 'wheel'
+
+        this.init();
+      }
+
+      async init() {
+        // 1. Check if encrypted payload is present
+        if (window.__ENCRYPTED_PAYLOAD__) {
+          const unlocked = await this.handleVaultUnlock();
+          if (!unlocked) return; // Wait for user passphrase submission
+        } else if (window.__RESTAURANTS_DATA__ && window.__RESTAURANTS_DATA__.length > 0) {
+          this.restaurants = window.__RESTAURANTS_DATA__;
+        } else {
+          try {
+            const res = await fetch('data/restaurants.json');
+            const data = await res.json();
+            this.restaurants = data.restaurants || [];
+            this.station = data.station || this.station;
+          } catch(e) {
+            console.warn('Could not fetch data/restaurants.json directly:', e);
+          }
+        }
+
+        this.finishStartup();
+      }
+
+      async handleVaultUnlock() {
+        const payload = window.__ENCRYPTED_PAYLOAD__;
+        const savedPass = localStorage.getItem('takeout_passphrase');
+        if (savedPass) {
+          try {
+            const dec = await decryptPayloadWebCrypto(savedPass, payload);
+            if (Array.isArray(dec)) {
+              this.restaurants = dec;
+            } else if (dec && dec.restaurants) {
+              this.restaurants = dec.restaurants;
+              this.station = dec.station || this.station;
+            }
+            this.showLockVaultButton();
+            return true;
+          } catch(e) {
+            localStorage.removeItem('takeout_passphrase');
+          }
+        }
+        this.showVaultModal();
+        return false;
+      }
+
+      showVaultModal() {
+        const modal = document.getElementById('vaultModal');
+        modal.classList.remove('hidden');
+        const input = document.getElementById('vaultPasswordInput');
+        setTimeout(() => input.focus(), 150);
+
+        document.getElementById('vaultTogglePasswordBtn').onclick = () => {
+          input.type = input.type === 'password' ? 'text' : 'password';
+        };
+
+        document.getElementById('vaultForm').onsubmit = async (e) => {
+          e.preventDefault();
+          const pass = input.value.trim();
+          const submitBtn = document.getElementById('vaultSubmitBtn');
+          const errorEl = document.getElementById('vaultError');
+          errorEl.classList.add('hidden');
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span>Verifying...</span>';
+
+          try {
+            const dec = await decryptPayloadWebCrypto(pass, window.__ENCRYPTED_PAYLOAD__);
+            if (Array.isArray(dec)) {
+              this.restaurants = dec;
+            } else if (dec && dec.restaurants) {
+              this.restaurants = dec.restaurants;
+              this.station = dec.station || this.station;
+            }
+            if (document.getElementById('vaultRememberCheck').checked) {
+              localStorage.setItem('takeout_passphrase', pass);
+            }
+            modal.classList.add('hidden');
+            this.showLockVaultButton();
+            this.finishStartup();
+          } catch (err) {
+            errorEl.classList.remove('hidden');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span>🔓 Unlock TakeoutRoulette</span>';
+          }
+        };
+      }
+
+      showLockVaultButton() {
+        const lockBtn = document.getElementById('lockVaultBtn');
+        if (lockBtn) {
+          lockBtn.classList.remove('hidden');
+          lockBtn.classList.add('flex');
+          lockBtn.onclick = () => {
+            if (confirm('Lock TakeoutRoulette vault and clear saved passphrase on this device?')) {
+              localStorage.removeItem('takeout_passphrase');
+              location.reload();
+            }
+          };
+        }
+      }
+
+      finishStartup() {
+        this.bindEvents();
+        this.startClock();
+        this.updateFilterCounts();
+        this.renderHistory();
+        this.renderStats();
+
+        // Update tab badge counts
+        document.getElementById('tabCountBadge').textContent = this.restaurants.length;
+
+        // Dynamic station labels if configured in decrypted data
+        if (this.station && this.station.name) {
+          const stLabel = this.station.name.replace(/\s*\(.*\)/, '').trim();
+          const opt = document.querySelector('#stationSelector option');
+          if (opt) opt.textContent = `📍 ${this.station.name}`;
+          const sub = document.getElementById('headerSubtitle');
+          if (sub) sub.textContent = stLabel;
+        }
+      }
+
+      startClock() {
+        const update = () => {
+          const now = this.getEffectiveTime();
+          const h = String(now.getHours()).padStart(2, '0');
+          const m = String(now.getMinutes()).padStart(2, '0');
+          const s = String(now.getSeconds()).padStart(2, '0');
+          document.getElementById('currentTimeDisplay').textContent = `${h}:${m}:${s} JST`;
+        };
+        update();
+        setInterval(update, 1000);
+      }
+
+      getEffectiveTime() {
+        const simulated = document.getElementById('simulatedTimeInput').value;
+        if (simulated) {
+          const [h, m] = simulated.split(':');
+          const d = new Date();
+          d.setHours(parseInt(h, 10), parseInt(m, 10), 0);
+          return d;
+        }
+        return new Date();
+      }
+
+      bindEvents() {
+        // Tab Switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            this.switchTab(tab);
+          });
+        });
+
+        // Filter Inputs Change
+        ['filterOpenNow', 'filterExcludeOrdered', 'filterMaxDistance', 'filterMinRating', 'filterCuisine', 'filterBudget', 'simulatedTimeInput']
+          .forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+              el.addEventListener('input', () => {
+                if (id === 'filterMaxDistance') {
+                  const val = el.value;
+                  const mins = Math.ceil(val / 80);
+                  document.getElementById('distDisplay').textContent = `Within ${val}m (~${mins} min walk)`;
+                }
+                this.updateFilterCounts();
+                if (this.spinMode === 'wheel') this.drawWheel();
+              });
+            }
+          });
+
+        // Time reset button
+        document.getElementById('resetTimeBtn').addEventListener('click', () => {
+          document.getElementById('simulatedTimeInput').value = '';
+          this.updateFilterCounts();
+        });
+
+        // Spin Mode Toggle
+        document.getElementById('modeSlotBtn').addEventListener('click', () => {
+          this.spinMode = 'slot';
+          document.getElementById('modeSlotBtn').className = 'px-2.5 py-1 rounded-lg bg-brand-500 text-white font-semibold transition';
+          document.getElementById('modeWheelBtn').className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition';
+          document.getElementById('slotStage').classList.remove('hidden');
+          document.getElementById('wheelStage').classList.add('hidden');
+        });
+
+        document.getElementById('modeWheelBtn').addEventListener('click', () => {
+          this.spinMode = 'wheel';
+          document.getElementById('modeWheelBtn').className = 'px-2.5 py-1 rounded-lg bg-brand-500 text-white font-semibold transition';
+          document.getElementById('modeSlotBtn').className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition';
+          document.getElementById('slotStage').classList.add('hidden');
+          document.getElementById('wheelStage').classList.remove('hidden');
+          this.drawWheel();
+        });
+
+        // Spin Button Trigger
+        document.getElementById('spinBtn').addEventListener('click', () => this.spinRoulette());
+        document.getElementById('spinAgainBtn').addEventListener('click', () => this.spinRoulette());
+
+        // Pool View Modal
+        document.getElementById('viewPoolBtn').addEventListener('click', () => this.openPoolModal());
+
+        // Sound Toggle
+        document.getElementById('soundToggleBtn').addEventListener('click', () => {
+          sound.enabled = !sound.enabled;
+          document.getElementById('soundIcon').textContent = sound.enabled ? '🔊' : '🔇';
+        });
+
+        // Search in Grid
+        document.getElementById('restaurantSearchInput').addEventListener('input', () => this.renderGrid());
+        document.getElementById('gridSortSelect').addEventListener('change', () => this.renderGrid());
+
+        // Sync Modal
+        document.getElementById('openSyncModalBtn').addEventListener('click', () => {
+          this.switchTab('settings');
+        });
+
+        // Export / Import / QR
+        document.getElementById('exportJsonBtn').addEventListener('click', () => this.exportBackup());
+        document.getElementById('copyJsonBtn').addEventListener('click', () => this.copyBackup());
+        document.getElementById('importJsonBtn').addEventListener('click', () => this.importBackup());
+        document.getElementById('showQrBtn').addEventListener('click', () => {
+          document.getElementById('qrModal').classList.remove('hidden');
+          const canvas = document.getElementById('qrCanvas');
+          if (window.QRCode) {
+            QRCode.toCanvas(canvas, window.location.href, { width: 200, margin: 2 }, function (err) {
+              if (err) console.error(err);
+            });
+          }
+        });
+
+        // Mark Ordered flow
+        document.getElementById('markOrderedBtn').addEventListener('click', () => {
+          if (!this.activeWinner) return;
+          this.openOrderModal(this.activeWinner);
+        });
+
+        document.getElementById('saveOrderNoteBtn').addEventListener('click', () => this.saveOrderFromModal());
+        document.getElementById('cancelOrderNoteBtn').addEventListener('click', () => {
+          document.getElementById('orderNoteModal').classList.add('hidden');
+        });
+
+        // Clear History
+        document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+          if (confirm('Clear all order history?')) {
+            this.state.history = [];
+            StorageManager.saveState(this.state);
+            this.renderHistory();
+            this.renderStats();
+            this.updateFilterCounts();
+          }
+        });
+
+        // Bias Sliders
+        const biasDistLabels = ['Disabled (Equal)', 'Balanced (Standard)', 'High (Proximity+)', 'Maximum (Closest First)'];
+        const biasRatingLabels = ['Disabled (Equal)', 'Balanced (Standard)', 'High (Rating+)', 'Maximum (Gourmet First)'];
+
+        document.getElementById('biasDistanceInput').addEventListener('input', (e) => {
+          this.state.preferences.bias_dist = parseInt(e.target.value, 10);
+          document.getElementById('biasDistanceLabel').textContent = biasDistLabels[this.state.preferences.bias_dist];
+          StorageManager.saveState(this.state);
+          this.updateFilterCounts();
+        });
+
+        document.getElementById('biasRatingInput').addEventListener('input', (e) => {
+          this.state.preferences.bias_rating = parseInt(e.target.value, 10);
+          document.getElementById('biasRatingLabel').textContent = biasRatingLabels[this.state.preferences.bias_rating];
+          StorageManager.saveState(this.state);
+          this.updateFilterCounts();
+        });
+      }
+
+      switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          if (b.dataset.tab === tabName) {
+            b.className = 'tab-btn active px-3 py-2 font-medium rounded-lg text-brand-400 bg-brand-500/10 flex items-center space-x-2 transition';
+          } else {
+            b.className = 'tab-btn px-3 py-2 font-medium rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 flex items-center space-x-2 transition';
+          }
+        });
+
+        document.querySelectorAll('.tab-pane').forEach(p => {
+          if (p.id === `tab-${tabName}`) {
+            p.classList.remove('hidden');
+            p.classList.add('block');
+          } else {
+            p.classList.add('hidden');
+            p.classList.remove('block');
+          }
+        });
+
+        if (tabName === 'explore') {
+          if (!this.mapInitialized) {
+            setTimeout(() => this.initMap(), 100);
+          } else if (this.map) {
+            setTimeout(() => this.map.invalidateSize(), 100);
+          }
+          this.renderGrid();
+        }
+      }
+
+      /* =========================================================================
+         FILTERING & WEIGHTED RANDOM PROBABILITY ENGINE
+         ========================================================================= */
+      getEligiblePool() {
+        const openNow = document.getElementById('filterOpenNow').checked;
+        const excludeOrdered = document.getElementById('filterExcludeOrdered').checked;
+        const maxDist = parseInt(document.getElementById('filterMaxDistance').value, 10);
+        const minRating = parseFloat(document.getElementById('filterMinRating').value);
+        const cuisine = document.getElementById('filterCuisine').value;
+        const budget = document.getElementById('filterBudget').value;
+        const effectiveTime = this.getEffectiveTime();
+
+        const orderedIds = new Set(this.state.history.map(h => String(h.id)));
+        const blacklistIds = new Set(this.state.blacklist.map(String));
+
+        const pool = [];
+
+        for (const r of this.restaurants) {
+          if (blacklistIds.has(String(r.id))) continue;
+
+          // 1. Exclude already ordered?
+          if (excludeOrdered && orderedIds.has(String(r.id))) continue;
+
+          // 2. Open Now?
+          if (openNow) {
+            const status = HoursEvaluator.isOpen(r, effectiveTime);
+            if (!status.open) continue;
+          }
+
+          // 3. Max distance
+          const dist = r.distance_meters || 500;
+          if (dist > maxDist) continue;
+
+          // 4. Rating
+          const rating = r.rating || 3.0;
+          if (rating < minRating) continue;
+
+          // 5. Cuisine
+          if (cuisine !== 'all') {
+            const cats = r.categories || [];
+            if (!cats.includes(cuisine)) continue;
+          }
+
+          // 6. Night Dinner Budget Evaluation
+          let dinnerMin = r.budget_dinner_min;
+          let dinnerMax = r.budget_dinner_max;
+          if (dinnerMin === undefined || dinnerMin === null) {
+            const bD = r.budget_dinner || '';
+            const m1 = bD.match(/[～~](\d[\d,]*)/);
+            const m2 = bD.match(/(\d[\d,]*)[～~](\d[\d,]*)/);
+            if (m2) {
+              dinnerMin = parseInt(m2[1].replace(/,/g, ''), 10);
+              dinnerMax = parseInt(m2[2].replace(/,/g, ''), 10);
+            } else if (m1) {
+              dinnerMin = 0;
+              dinnerMax = parseInt(m1[1].replace(/,/g, ''), 10);
+            }
+          }
+
+          // Representative price at night
+          const repPrice = dinnerMax || dinnerMin || r.budget_lunch_max || r.budget_lunch_min || 1500;
+
+          if (budget !== 'all') {
+            const maxAllowed = parseInt(budget, 10);
+            // If the minimum dinner price is above our limit, exclude!
+            if (dinnerMin !== undefined && dinnerMin !== null && dinnerMin > maxAllowed) {
+              continue;
+            }
+            // If representative price is well beyond (e.g. over 1.2x maxAllowed), exclude!
+            if (repPrice > maxAllowed * 1.2) {
+              continue;
+            }
+          }
+
+          // Calculate weight
+          const biasDist = this.state.preferences.bias_dist ?? 1;
+          const biasRating = this.state.preferences.bias_rating ?? 1;
+
+          // Proximity weight factor
+          const distFactor = Math.pow(600 / Math.max(100, dist + 100), biasDist * 0.85);
+
+          // Rating weight factor
+          const ratingFactor = Math.pow(Math.max(0.1, rating - 2.0), biasRating * 1.5);
+
+          // Realistic Takeout Price Curve
+          // (under 2,000 preferred for everyday takeout, 4,000 acceptable but lower probability)
+          let priceFactor = 1.0;
+          if (repPrice <= 1200) {
+            priceFactor = 1.35; // Ideal everyday bento/takeout
+          } else if (repPrice <= 2000) {
+            priceFactor = 1.20; // Standard casual dinner
+          } else if (repPrice <= 3000) {
+            priceFactor = 0.95; // Good treat
+          } else if (repPrice <= 4000) {
+            priceFactor = 0.65; // Acceptable, but less frequent
+          } else if (repPrice <= 6000) {
+            priceFactor = 0.35; // Occasional splurge
+          } else {
+            priceFactor = 0.10; // Luxury
+          }
+
+          const weight = Math.max(0.01, distFactor * ratingFactor * priceFactor);
+
+          pool.push({
+            restaurant: r,
+            weight: weight,
+            openStatus: HoursEvaluator.isOpen(r, effectiveTime)
+          });
+        }
+
+        // Calculate probability % for each item
+        const totalWeight = pool.reduce((acc, cur) => acc + cur.weight, 0);
+        pool.forEach(item => {
+          item.probability = totalWeight > 0 ? (item.weight / totalWeight) * 100 : 0;
+        });
+
+        // Sort descending by weight
+        pool.sort((a, b) => b.weight - a.weight);
+
+        return pool;
+      }
+
+      updateFilterCounts() {
+        const pool = this.getEligiblePool();
+        const badge = document.getElementById('eligiblePoolCount');
+        if (badge) {
+          badge.textContent = `Eligible: ${pool.length} spots`;
+          if (pool.length === 0) {
+            badge.className = 'text-xs px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 font-semibold border border-rose-500/30';
+          } else {
+            badge.className = 'text-xs px-2.5 py-1 rounded-full bg-brand-500/20 text-brand-400 font-semibold border border-brand-500/30';
+          }
+        }
+      }
+
+      /* =========================================================================
+         ROULETTE SPINNING ANIMATION & SELECTION
+         ========================================================================= */
+      spinRoulette() {
+        if (this.isSpinning) return;
+        const pool = this.getEligiblePool();
+
+        if (pool.length === 0) {
+          alert('No restaurants match your current filters.\nTry increasing the walking distance or turning off "Open Right Now Only".');
+          return;
+        }
+
+        this.isSpinning = true;
+        const spinBtn = document.getElementById('spinBtn');
+        spinBtn.disabled = true;
+        spinBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+        // Weighted Random Pick
+        const totalWeight = pool.reduce((acc, cur) => acc + cur.weight, 0);
+        let randomVal = Math.random() * totalWeight;
+        let winnerItem = pool[0];
+
+        for (const item of pool) {
+          if (randomVal <= item.weight) {
+            winnerItem = item;
+            break;
+          }
+          randomVal -= item.weight;
+        }
+
+        const winner = winnerItem.restaurant;
+
+        if (this.spinMode === 'wheel') {
+          this.animateWheelSpin(winner, () => {
+            this.finishSpin(winner);
+          });
+        } else {
+          this.animateSlotSpin(pool, winner, () => {
+            this.finishSpin(winner);
+          });
+        }
+      }
+
+      animateSlotSpin(pool, winner, onComplete) {
+        let step = 0;
+        const totalSteps = 28;
+        let delay = 50;
+        const nameEl = document.getElementById('reelRestaurantName');
+        const subEl = document.getElementById('reelRestaurantSub');
+
+        const stepFunc = () => {
+          sound.playTick();
+          const randomSample = pool[Math.floor(Math.random() * pool.length)].restaurant;
+          nameEl.textContent = randomSample.name;
+          subEl.textContent = `${randomSample.genres.join(' / ')} • ⭐ ${randomSample.rating}`;
+
+          step++;
+          if (step < totalSteps) {
+            delay += 12; // Deceleration physics
+            setTimeout(stepFunc, delay);
+          } else {
+            nameEl.textContent = winner.name;
+            subEl.textContent = `${winner.genres.join(' / ')} • ⭐ ${winner.rating}`;
+            onComplete();
+          }
+        };
+
+        stepFunc();
+      }
+
+      getWheelPool(winner = null) {
+        const pool = this.getEligiblePool();
+        if (pool.length === 0) return [];
+        let wheelPool = pool.slice(0, 10);
+        if (winner) {
+          const winnerInPool = wheelPool.some(item => item.restaurant.id === winner.id);
+          if (!winnerInPool) {
+            const winnerItem = pool.find(item => item.restaurant.id === winner.id);
+            if (winnerItem) {
+              wheelPool[wheelPool.length - 1] = winnerItem;
+            } else {
+              wheelPool[wheelPool.length - 1] = {
+                restaurant: winner,
+                weight: winner.rating || 3.0,
+                probability: 10
+              };
+            }
+          }
+        }
+        return wheelPool;
+      }
+
+      animateWheelSpin(winner, onComplete) {
+        const pool = this.getWheelPool(winner);
+        if (pool.length === 0) {
+          onComplete();
+          return;
+        }
+
+        let winnerIndex = pool.findIndex(item => item.restaurant.id === winner.id);
+        if (winnerIndex === -1) winnerIndex = 0;
+
+        const totalWeight = pool.reduce((sum, it) => sum + (it.weight || 1), 0);
+        let accAngle = 0;
+        let winnerCenter = 0;
+        let winnerSliceAngle = 0;
+
+        pool.forEach((item, idx) => {
+          const slice = ((item.weight || 1) / totalWeight) * (2 * Math.PI);
+          if (idx === winnerIndex) {
+            winnerCenter = accAngle + slice / 2;
+            winnerSliceAngle = slice;
+          }
+          accAngle += slice;
+        });
+
+        // Pointer is at the top of the canvas (12 o'clock, 3*PI/2 or 270 deg)
+        const pointerAngle = 1.5 * Math.PI;
+        // Jitter within slice (+-25% from center) so it lands naturally
+        const jitter = (Math.random() - 0.5) * (winnerSliceAngle * 0.5);
+        let targetAngle = pointerAngle - (winnerCenter + jitter);
+        targetAngle = ((targetAngle % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+
+        const fullSpins = (5 + Math.floor(Math.random() * 2)) * (2 * Math.PI);
+        const startAngle = this.wheelRotation || 0;
+        const currentMod = ((startAngle % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+        let delta = targetAngle - currentMod;
+        if (delta <= 0) delta += 2 * Math.PI;
+        const totalDelta = fullSpins + delta;
+        const finalAngle = startAngle + totalDelta;
+
+        const duration = 3600;
+        const startTime = performance.now();
+        let lastTickSlice = -1;
+
+        const tick = (now) => {
+          const elapsed = now - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          // Quartic ease-out: 1 - (1 - t)^4
+          const ease = 1 - Math.pow(1 - progress, 4);
+          const currentRotation = startAngle + totalDelta * ease;
+          this.wheelRotation = currentRotation;
+
+          // Sound tick as slices pass under the pointer
+          const curSlice = Math.floor((((pointerAngle - currentRotation) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI / pool.length));
+          if (curSlice !== lastTickSlice) {
+            sound.playTick();
+            lastTickSlice = curSlice;
+          }
+
+          this.drawWheel(currentRotation, pool);
+
+          if (progress < 1) {
+            requestAnimationFrame(tick);
+          } else {
+            this.wheelRotation = finalAngle;
+            this.drawWheel(finalAngle, pool);
+            onComplete();
+          }
+        };
+
+        requestAnimationFrame(tick);
+      }
+
+      drawWheel(rotation = 0, customPool = null) {
+        const canvas = document.getElementById('wheelCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const pool = customPool || this.getWheelPool();
+        if (pool.length === 0) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const displaySize = 300;
+        if (canvas.width !== displaySize * dpr || canvas.height !== displaySize * dpr) {
+          canvas.width = displaySize * dpr;
+          canvas.height = displaySize * dpr;
+        }
+
+        ctx.save();
+        ctx.scale(dpr, dpr);
+
+        const width = displaySize;
+        const height = displaySize;
+        const center = width / 2;
+        const radius = center - 12;
+
+        ctx.clearRect(0, 0, width, height);
+
+        // Normalized slice angles filling 100% (360 degrees) of the wheel
+        const totalWeight = pool.reduce((sum, item) => sum + (item.weight || 1), 0);
+        const colors = [
+          '#ea580c', '#0284c7', '#059669', '#d97706',
+          '#7c3aed', '#db2777', '#0891b2', '#65a30d',
+          '#4f46e5', '#ca8a04'
+        ];
+
+        let startAngle = rotation;
+
+        pool.forEach((item, idx) => {
+          const sliceFraction = (item.weight || 1) / totalWeight;
+          const sliceAngle = sliceFraction * 2 * Math.PI;
+          const endAngle = startAngle + sliceAngle;
+
+          ctx.beginPath();
+          ctx.moveTo(center, center);
+          ctx.arc(center, center, radius, startAngle, endAngle);
+          ctx.closePath();
+          ctx.fillStyle = colors[idx % colors.length];
+          ctx.fill();
+          ctx.strokeStyle = '#090d16';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+
+          // Slice Text Label
+          ctx.save();
+          ctx.translate(center, center);
+          ctx.rotate(startAngle + sliceAngle / 2);
+          ctx.textAlign = 'right';
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 11px sans-serif';
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+          ctx.shadowBlur = 3;
+          const label = item.restaurant.name.length > 9 
+            ? item.restaurant.name.slice(0, 8) + '…' 
+            : item.restaurant.name;
+          ctx.fillText(label, radius - 14, 4);
+          ctx.restore();
+
+          startAngle = endAngle;
+        });
+
+        // Center hub
+        ctx.beginPath();
+        ctx.arc(center, center, 24, 0, 2 * Math.PI);
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+        ctx.strokeStyle = '#f97316';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.font = '16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🍱', center, center);
+
+        ctx.restore();
+      }
+
+      finishSpin(winner) {
+        this.isSpinning = false;
+        this.activeWinner = winner;
+
+        const spinBtn = document.getElementById('spinBtn');
+        spinBtn.disabled = false;
+        spinBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+        // Play Fanfare & Shoot Confetti
+        sound.playFanfare();
+        if (window.confetti) {
+          window.confetti({
+            particleCount: 80,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        }
+
+        // Display Winner Card
+        const card = document.getElementById('winnerCardContainer');
+        card.classList.remove('hidden');
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        document.getElementById('winnerName').textContent = winner.name;
+        document.getElementById('winnerGenreBadge').textContent = (winner.genres || []).join(' / ') || 'Cuisine';
+        const stOrigin = this.station && this.station.name ? this.station.name.replace(/\s*\(.*\)/, '').trim() : 'Station';
+        document.getElementById('winnerDistBadge').textContent = `🚶 ~${winner.walking_minutes || 5} min walk from ${stOrigin} (${winner.distance_meters || 500}m)`;
+        document.getElementById('winnerRatingBadge').textContent = `⭐ ${winner.rating ? winner.rating.toFixed(2) : '3.00'}`;
+        
+        const openStatus = HoursEvaluator.isOpen(winner, this.getEffectiveTime());
+        document.getElementById('winnerOpenBadge').textContent = openStatus.label;
+        document.getElementById('winnerOpenBadge').className = openStatus.open 
+          ? 'absolute bottom-2 left-2 px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-md bg-emerald-500/80 text-white shadow'
+          : 'absolute bottom-2 left-2 px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-md bg-slate-700/80 text-slate-300 shadow';
+
+        document.getElementById('winnerHoursText').querySelector('span:last-child').textContent = winner.hours_raw || 'Check schedule';
+        const dinnerStr = winner.budget_dinner ? `🌙 Dinner: ${winner.budget_dinner}` : '';
+        const lunchStr = winner.budget_lunch ? `☀️ Lunch: ${winner.budget_lunch}` : '';
+        const budgetDisplay = [dinnerStr, lunchStr].filter(Boolean).join(' • ') || (winner.budget_dinner || winner.budget_lunch || '￥1,000～￥2,000');
+        document.getElementById('winnerBudgetText').querySelector('span:last-child').textContent = budgetDisplay;
+
+        // Photo
+        const img = document.getElementById('winnerImage');
+        const fallback = document.getElementById('winnerImageFallback');
+        if (winner.image_url) {
+          img.src = winner.image_url;
+          img.classList.remove('hidden');
+          fallback.classList.add('hidden');
+        } else {
+          img.classList.add('hidden');
+          fallback.classList.remove('hidden');
+        }
+
+        // External Links
+        // 1. Official Website
+        const webBtn = document.getElementById('winnerWebsiteLink');
+        if (webBtn) {
+          if (winner.website) {
+            webBtn.href = winner.website;
+            webBtn.classList.remove('hidden');
+            webBtn.classList.add('flex');
+          } else {
+            webBtn.classList.add('hidden');
+            webBtn.classList.remove('flex');
+          }
+        }
+
+        // 2. Official SNS Accounts
+        const snsContainer = document.getElementById('winnerSnsContainer');
+        if (snsContainer) {
+          snsContainer.innerHTML = '';
+          if (winner.official_sns && winner.official_sns.length > 0) {
+            winner.official_sns.forEach(sns => {
+              const a = document.createElement('a');
+              a.href = sns.url;
+              a.target = '_blank';
+              a.rel = 'noopener';
+              const icon = sns.type === 'instagram' ? '📷' :
+                           sns.type === 'x' ? '𝕏' :
+                           sns.type === 'facebook' ? '📘' :
+                           sns.type === 'line' ? '💬' : '🔗';
+              const bgClass = sns.type === 'instagram' ? 'bg-gradient-to-r from-purple-600 via-pink-600 to-rose-500 hover:opacity-90' :
+                              sns.type === 'x' ? 'bg-slate-800 hover:bg-slate-700 border border-slate-700' :
+                              sns.type === 'facebook' ? 'bg-blue-600 hover:bg-blue-500' :
+                              sns.type === 'line' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-slate-800 hover:bg-slate-700';
+              a.className = `px-3 py-1.5 rounded-lg text-white font-medium flex items-center space-x-1.5 transition text-xs shadow ${bgClass}`;
+              a.innerHTML = `<span>${icon}</span><span>${sns.label || 'Official SNS'}</span>`;
+              snsContainer.appendChild(a);
+            });
+          }
+        }
+
+        // 3. Google Maps, Tabelog & Uber Eats
+        document.getElementById('winnerUberLink').href = winner.ubereats_url || '#';
+        document.getElementById('winnerMapLink').href = winner.google_maps_dir || winner.google_maps_url || '#';
+        document.getElementById('winnerTabelogLink').href = winner.tabelog_url || '#';
+
+        // 4. Phone
+        const phoneBtn = document.getElementById('winnerPhoneLink');
+        if (winner.phone) {
+          phoneBtn.href = `tel:${winner.phone}`;
+          phoneBtn.classList.remove('hidden');
+          phoneBtn.classList.add('flex');
+          document.getElementById('winnerPhoneText').textContent = winner.phone;
+        } else {
+          phoneBtn.classList.add('hidden');
+          phoneBtn.classList.remove('flex');
+        }
+      }
+
+      /* =========================================================================
+         ORDER RECORDING & HISTORY
+         ========================================================================= */
+      openOrderModal(restaurant) {
+        document.getElementById('orderModalRestaurantName').textContent = `${restaurant.name} (${restaurant.address || ''})`;
+        document.getElementById('orderModalNoteInput').value = '';
+        document.getElementById('orderNoteModal').classList.remove('hidden');
+      }
+
+      saveOrderFromModal() {
+        if (!this.activeWinner) return;
+        const note = document.getElementById('orderModalNoteInput').value.trim();
+
+        const entry = {
+          id: String(this.activeWinner.id),
+          name: this.activeWinner.name,
+          rating: this.activeWinner.rating,
+          genres: this.activeWinner.genres || [],
+          distance_meters: this.activeWinner.distance_meters,
+          ordered_at: new Date().toISOString(),
+          note: note
+        };
+
+        this.state.history.unshift(entry);
+        StorageManager.saveState(this.state);
+
+        document.getElementById('orderNoteModal').classList.add('hidden');
+        this.renderHistory();
+        this.renderStats();
+        this.updateFilterCounts();
+
+        alert(`✅ Saved "${this.activeWinner.name}" to your order history!\nIt will be skipped on subsequent spins.`);
+      }
+
+      renderHistory() {
+        const list = document.getElementById('historyListContainer');
+        const badge = document.getElementById('historyCountBadge');
+        badge.textContent = this.state.history.length;
+
+        if (this.state.history.length === 0) {
+          list.innerHTML = `
+            <div class="text-center py-10 text-slate-500 text-sm">
+              No order history yet. Spin the roulette to decide tonight's dinner!
+            </div>
+          `;
+          return;
+        }
+
+        list.innerHTML = this.state.history.map((h, idx) => {
+          const dateStr = new Date(h.ordered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          return `
+            <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-4 text-xs sm:text-sm">
+              <div>
+                <div class="flex items-center space-x-2">
+                  <span class="font-bold text-slate-100">${h.name}</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">${dateStr}</span>
+                </div>
+                ${h.note ? `<p class="text-xs text-brand-300 mt-1">💬 ${h.note}</p>` : ''}
+              </div>
+              <button onclick="window.app.removeHistoryItem(${idx})" class="text-slate-500 hover:text-rose-400 text-xs transition">
+                Delete
+              </button>
+            </div>
+          `;
+        }).join('');
+      }
+
+      removeHistoryItem(idx) {
+        this.state.history.splice(idx, 1);
+        StorageManager.saveState(this.state);
+        this.renderHistory();
+        this.renderStats();
+        this.updateFilterCounts();
+      }
+
+      renderStats() {
+        const count = this.state.history.length;
+        const unique = new Set(this.state.history.map(h => h.id)).size;
+        document.getElementById('statTotalOrders').textContent = count;
+        document.getElementById('statUniqueRestaurants').textContent = unique;
+        document.getElementById('statLifeEscapes').textContent = count;
+        document.getElementById('statFavoriteCount').textContent = this.state.favorites.length;
+      }
+
+      /* =========================================================================
+         MAP & RESTAURANTS GRID EXPLORER
+         ========================================================================= */
+      initMap() {
+        const container = document.getElementById('leafletMap');
+        if (!container || this.mapInitialized) return;
+
+        const stationLat = this.station.lat || 35.645736;
+        const stationLng = this.station.lng || 139.747575;
+
+        this.map = L.map('leafletMap').setView([stationLat, stationLng], 16);
+
+        // OpenStreetMap raster tiles (no API key required)
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(this.map);
+
+        // Distance Circles from Station
+        L.circle([stationLat, stationLng], { radius: 300, color: '#38bdf8', weight: 1.5, fillOpacity: 0.05 }).addTo(this.map);
+        L.circle([stationLat, stationLng], { radius: 500, color: '#f97316', weight: 1.5, fillOpacity: 0.04 }).addTo(this.map);
+        L.circle([stationLat, stationLng], { radius: 800, color: '#a855f7', weight: 1.5, fillOpacity: 0.03 }).addTo(this.map);
+
+        // Station Landmark Pin
+        const staLabel = this.station && this.station.name ? this.station.name.replace(/\s*\(.*\)/, '').trim() : 'Station';
+        const stationIcon = L.divIcon({
+          html: `<div class="bg-sky-500 text-white font-bold p-1.5 rounded-lg shadow-lg border-2 border-white text-xs text-center whitespace-nowrap">🚉 ${staLabel}</div>`,
+          className: 'custom-pin',
+          iconSize: [85, 30]
+        });
+        L.marker([stationLat, stationLng], { icon: stationIcon }).addTo(this.map)
+          .bindPopup(`<b>${this.station && this.station.name ? this.station.name : 'Station Origin'}</b><br>Baseline Origin`);
+
+        // Custom Landmark Pins (from decrypted station config)
+        (this.station && this.station.landmarks ? this.station.landmarks : []).forEach(lm => {
+          if (!lm.lat || !lm.lng) return;
+          const lmIcon = L.divIcon({
+            html: `<div class="bg-emerald-600 text-white font-bold p-1 rounded-lg shadow-lg border-2 border-white text-[11px] text-center whitespace-nowrap">🛒 Standby</div>`,
+            className: 'custom-pin',
+            iconSize: [75, 26]
+          });
+          L.marker([lm.lat, lm.lng], { icon: lmIcon }).addTo(this.map)
+            .bindPopup(`<b>${lm.name}</b><br>${lm.note || 'Standby Landmark'}`);
+        });
+
+        // Restaurant Pins
+        this.restaurants.forEach(r => {
+          if (!r.lat || !r.lng) return;
+          const isTopTier = (r.rating || 0) >= 3.4;
+          const markerColor = isTopTier ? '#f59e0b' : '#38bdf8';
+
+          const marker = L.circleMarker([r.lat, r.lng], {
+            radius: isTopTier ? 7 : 5,
+            fillColor: markerColor,
+            color: '#ffffff',
+            weight: 1.5,
+            fillOpacity: 0.9
+          }).addTo(this.map);
+
+          marker.bindPopup(`
+            <div class="text-xs space-y-1">
+              <div class="font-bold text-slate-100">${r.name}</div>
+              <div class="text-amber-400 font-semibold">⭐ ${r.rating ? r.rating.toFixed(2) : '3.00'} • ${r.genres ? r.genres.join('/') : ''}</div>
+              <div class="text-slate-400">~${r.walking_minutes || 5} min walk (${r.distance_meters}m)</div>
+              <div class="pt-1 flex flex-wrap gap-2 text-[11px]">
+                <a href="${r.tabelog_url}" target="_blank" class="text-brand-400 font-semibold underline">Tabelog</a>
+                <a href="${r.google_maps_dir}" target="_blank" class="text-sky-400 font-semibold underline">Directions</a>
+                ${r.website ? `<a href="${r.website}" target="_blank" rel="noopener" class="text-indigo-400 font-semibold underline">Website</a>` : ''}
+                ${(r.official_sns || []).some(s => s.type === 'instagram') ? `<a href="${r.official_sns.find(s => s.type === 'instagram').url}" target="_blank" rel="noopener" class="text-pink-400 font-semibold underline">Instagram</a>` : ''}
+              </div>
+            </div>
+          `);
+        });
+
+        this.mapInitialized = true;
+      }
+
+      renderGrid() {
+        const query = document.getElementById('restaurantSearchInput').value.trim().toLowerCase();
+        const sortVal = document.getElementById('gridSortSelect').value;
+        const container = document.getElementById('restaurantCardsGrid');
+
+        let filtered = this.restaurants.filter(r => {
+          if (!query) return true;
+          const matchName = r.name.toLowerCase().includes(query);
+          const matchGenres = (r.genres || []).some(g => g.toLowerCase().includes(query));
+          const matchAddress = (r.address || '').toLowerCase().includes(query);
+          return matchName || matchGenres || matchAddress;
+        });
+
+        // Sort
+        if (sortVal === 'rating') {
+          filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        } else if (sortVal === 'distance') {
+          filtered.sort((a, b) => (a.distance_meters || 9999) - (b.distance_meters || 9999));
+        } else if (sortVal === 'name') {
+          filtered.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+        }
+
+        document.getElementById('gridTotalCount').textContent = `${filtered.length} spots`;
+
+        const effectiveTime = this.getEffectiveTime();
+
+        container.innerHTML = filtered.map(r => {
+          const status = HoursEvaluator.isOpen(r, effectiveTime);
+          return `
+            <div class="glass-card glass-card-hover rounded-xl p-4 flex flex-col justify-between space-y-3 transition">
+              <div>
+                <div class="flex items-start justify-between gap-2">
+                  <h4 class="font-bold text-sm text-slate-100 line-clamp-1">${r.name}</h4>
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold whitespace-nowrap">
+                    ⭐ ${r.rating ? r.rating.toFixed(2) : '3.00'}
+                  </span>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+                  <span>🚶 ~${r.walking_minutes || 5} min walk (${r.distance_meters || 500}m)</span>
+                  <span class="text-slate-300 font-medium">${r.budget_dinner ? `🌙 ${r.budget_dinner}` : (r.budget_lunch ? `☀️ ${r.budget_lunch}` : '')}</span>
+                </div>
+                <div class="flex flex-wrap gap-1 mt-2">
+                  ${(r.genres || []).slice(0, 3).map(g => `<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${g}</span>`).join('')}
+                </div>
+              </div>
+
+              <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                <span class="${status.open ? 'text-emerald-400' : 'text-slate-500'} font-medium">
+                  ${status.open ? '🟢 ' + status.label : '⚪ Closed'}
+                </span>
+                <div class="flex items-center space-x-2">
+                  ${r.website ? `<a href="${r.website}" target="_blank" rel="noopener" class="hover:opacity-80" title="Official Website">🌐</a>` : ''}
+                  ${(r.official_sns || []).some(s => s.type === 'instagram') ? `<a href="${r.official_sns.find(s => s.type === 'instagram').url}" target="_blank" rel="noopener" class="hover:opacity-80" title="Instagram">📸</a>` : ''}
+                  ${(r.official_sns || []).some(s => s.type === 'x') ? `<a href="${r.official_sns.find(s => s.type === 'x').url}" target="_blank" rel="noopener" class="hover:opacity-80" title="X (Twitter)">𝕏</a>` : ''}
+                  <a href="${r.google_maps_dir}" target="_blank" class="text-sky-400 hover:underline">Directions</a>
+                  <a href="${r.tabelog_url}" target="_blank" class="text-amber-400 hover:underline">Details</a>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      /* =========================================================================
+         POOL ODDS MODAL
+         ========================================================================= */
+      openPoolModal() {
+        const modal = document.getElementById('poolModal');
+        const list = document.getElementById('poolModalList');
+        const pool = this.getEligiblePool();
+
+        list.innerHTML = pool.map(item => {
+          const r = item.restaurant;
+          return `
+            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4 text-xs">
+              <div>
+                <div class="font-bold text-slate-200 text-sm">${r.name}</div>
+                <div class="text-slate-400 text-[11px] flex flex-wrap items-center gap-1.5 mt-0.5">
+                  <span class="text-amber-300 font-semibold">⭐ ${r.rating ? r.rating.toFixed(2) : '3.00'}</span>
+                  <span>•</span>
+                  <span>🚶 ~${r.walking_minutes || 5} min (${r.distance_meters || 500}m)</span>
+                  ${r.budget_dinner ? `<span>•</span><span class="text-slate-300 font-medium">🌙 ${r.budget_dinner}</span>` : ''}
+                  <span>•</span>
+                  <span>${(r.genres || []).slice(0, 2).join('/')}</span>
+                </div>
+              </div>
+              <div class="text-right whitespace-nowrap">
+                <span class="text-base font-extrabold text-brand-400">${item.probability.toFixed(1)}%</span>
+                <div class="text-[10px] text-slate-500">Winning Odds</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        modal.classList.remove('hidden');
+      }
+
+      /* =========================================================================
+         BACKUP, EXPORT & IMPORT
+         ========================================================================= */
+      exportBackup() {
+        const payload = JSON.stringify(this.state, null, 2);
+        const blob = new Blob([payload], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `TakeoutRoulette_backup_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      copyBackup() {
+        const payload = JSON.stringify(this.state, null, 2);
+        navigator.clipboard.writeText(payload).then(() => {
+          alert('📋 Backup JSON copied to clipboard!');
+        });
+      }
+
+      importBackup() {
+        const raw = document.getElementById('importJsonTextarea').value.trim();
+        if (!raw) {
+          alert('Please paste valid JSON backup data.');
+          return;
+        }
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.history)) {
+            this.state = parsed;
+            StorageManager.saveState(this.state);
+            this.renderHistory();
+            this.renderStats();
+            this.updateFilterCounts();
+            alert(`✅ Successfully restored data! (Order history: ${this.state.history.length} items)`);
+          } else {
+            alert('Invalid backup JSON format.');
+          }
+        } catch(e) {
+          alert('JSON parse error: ' + e.message);
+        }
+      }
+    }
+
+    // Launch App
+    document.addEventListener('DOMContentLoaded', () => {
+      window.app = new TakeoutApp();
+    });
+  </script>
+</body>
+</html>

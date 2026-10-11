@@ -1,0 +1,19 @@
+# Local secrets & environment
+.env
+.env.local
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.cache/
+
+# Local databases & temp outputs
+data/*.json
+test_*.json
+scratch/
+.DS_Store
+
+# Local screenshots & test captures
+docs/screenshots/
+*.png
