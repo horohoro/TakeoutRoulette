@@ -264,9 +264,9 @@
               <div>
                 <label class="block text-xs text-slate-300 font-medium mb-1">Minimum Tabelog Rating</label>
                 <select id="filterMinRating" class="w-full bg-slate-900 text-slate-200 border border-slate-800 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-brand-500 text-xs sm:text-sm">
-                  <option value="0">No minimum (All restaurants)</option>
+                  <option value="0" selected>No minimum (All restaurants)</option>
                   <option value="3.1">⭐ 3.10+ (Solid & tasty)</option>
-                  <option value="3.2" selected>⭐ 3.20+ (Locally recommended)</option>
+                  <option value="3.2">⭐ 3.20+ (Locally recommended)</option>
                   <option value="3.4">⭐ 3.40+ (Competitive favorite)</option>
                   <option value="3.5">⭐ 3.50+ (Top 3% elite tier)</option>
                 </select>
@@ -741,13 +741,17 @@
       </p>
       <div class="space-y-3 text-xs">
         <div>
-          <label class="block text-slate-300 font-medium mb-1">Rating (Optional)</label>
-          <div class="flex space-x-2 text-xl" id="starRatingSelector">
-            <button type="button" data-star="1" class="text-amber-400">★</button>
-            <button type="button" data-star="2" class="text-amber-400">★</button>
-            <button type="button" data-star="3" class="text-amber-400">★</button>
-            <button type="button" data-star="4" class="text-amber-400">★</button>
-            <button type="button" data-star="5" class="text-amber-400">★</button>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-slate-300 font-medium">Rating (Optional)</label>
+            <button type="button" id="clearStarRatingBtn" class="text-[11px] text-slate-400 hover:text-slate-200 transition cursor-pointer">Clear rating</button>
+          </div>
+          <div class="flex items-center space-x-2 text-xl" id="starRatingSelector">
+            <button type="button" data-star="1" class="text-slate-600 hover:scale-110 transition transform cursor-pointer">★</button>
+            <button type="button" data-star="2" class="text-slate-600 hover:scale-110 transition transform cursor-pointer">★</button>
+            <button type="button" data-star="3" class="text-slate-600 hover:scale-110 transition transform cursor-pointer">★</button>
+            <button type="button" data-star="4" class="text-slate-600 hover:scale-110 transition transform cursor-pointer">★</button>
+            <button type="button" data-star="5" class="text-slate-600 hover:scale-110 transition transform cursor-pointer">★</button>
+            <span id="starRatingLabel" class="text-xs text-slate-400 ml-2 font-normal">Unrated</span>
           </div>
         </div>
         <div>
@@ -909,7 +913,7 @@
             open_only: true,
             exclude_ordered: true,
             max_dist: 800,
-            min_rating: 3.2,
+            min_rating: 0,
             cuisine: 'all',
             budget: 'all',
             bias_dist: 1,
@@ -1051,7 +1055,7 @@
         this.isSpinning = false;
         this.activeWinner = null;
         this.targetOrderRestaurant = null;
-        this.modalStarRating = 5;
+        this.modalStarRating = null;
         this.spinMode = 'slot'; // 'slot' or 'wheel'
         this.commuteMinutes = 0;
         this.excludedCuisines = new Set();
@@ -1227,18 +1231,35 @@
       }
 
       setModalStarRating(rating) {
+        // Toggle behavior: clicking the currently active rating deselects it back to null
+        if (rating !== null && rating === this.modalStarRating) {
+          rating = null;
+        }
         this.modalStarRating = rating;
         const container = document.getElementById('starRatingSelector');
         if (!container) return;
         const buttons = container.querySelectorAll('button[data-star]');
         buttons.forEach(btn => {
           const starNum = parseInt(btn.dataset.star, 10);
-          if (starNum <= rating) {
+          if (rating !== null && starNum <= rating) {
             btn.className = 'text-amber-400 hover:scale-110 transition transform text-xl cursor-pointer';
           } else {
             btn.className = 'text-slate-600 hover:scale-110 transition transform text-xl cursor-pointer';
           }
         });
+
+        const labelEl = document.getElementById('starRatingLabel');
+        if (labelEl) {
+          const labels = {
+            1: '★ 1/5 Poor',
+            2: '★★ 2/5 Fair',
+            3: '★★★ 3/5 Good',
+            4: '★★★★ 4/5 Great',
+            5: '★★★★★ 5/5 Outstanding!'
+          };
+          labelEl.textContent = rating ? labels[rating] : 'Unrated';
+          labelEl.className = rating ? 'text-xs text-amber-300 ml-2 font-semibold' : 'text-xs text-slate-400 ml-2 font-normal';
+        }
       }
 
       setCommuteMinutes(mins, isGps = false) {
@@ -1399,6 +1420,14 @@
               const star = parseInt(btn.dataset.star, 10);
               this.setModalStarRating(star);
             });
+          });
+        }
+
+        const clearStarBtn = document.getElementById('clearStarRatingBtn');
+        if (clearStarBtn) {
+          clearStarBtn.addEventListener('click', () => {
+            this.modalStarRating = null;
+            this.setModalStarRating(null);
           });
         }
 
@@ -2069,7 +2098,8 @@
       openOrderModal(restaurant) {
         if (!restaurant) return;
         this.targetOrderRestaurant = restaurant;
-        this.setModalStarRating(5);
+        this.modalStarRating = null;
+        this.setModalStarRating(null);
         document.getElementById('orderModalRestaurantName').textContent = `${restaurant.name} (${restaurant.address || ''})`;
         document.getElementById('orderModalNoteInput').value = '';
         document.getElementById('orderNoteModal').classList.remove('hidden');
@@ -2084,7 +2114,7 @@
           id: String(target.id),
           name: target.name,
           rating: target.rating,
-          user_rating: this.modalStarRating || 5,
+          user_rating: this.modalStarRating, // null if unrated, or integer 1..5
           genres: target.genres || [],
           distance_meters: target.distance_meters,
           ordered_at: new Date().toISOString(),
@@ -2118,13 +2148,13 @@
 
         list.innerHTML = this.state.history.map((h, idx) => {
           const dateStr = new Date(h.ordered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-          const userStars = h.user_rating ? '★'.repeat(h.user_rating) : '★'.repeat(5);
+          const userStars = (h.user_rating && h.user_rating >= 1 && h.user_rating <= 5) ? '★'.repeat(h.user_rating) : '';
           return `
             <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-4 text-xs sm:text-sm">
               <div>
                 <div class="flex items-center space-x-2">
                   <span class="font-bold text-slate-100">${h.name}</span>
-                  <span class="text-amber-400 font-bold text-xs" title="Your Rating">${userStars}</span>
+                  ${userStars ? `<span class="text-amber-400 font-bold text-xs" title="Your Rating: ${h.user_rating}/5">${userStars}</span>` : '<span class="text-[10px] text-slate-500 italic">Unrated</span>'}
                   <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">${dateStr}</span>
                 </div>
                 ${h.note ? `<p class="text-xs text-brand-300 mt-1">💬 ${h.note}</p>` : ''}
