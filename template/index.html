@@ -173,18 +173,6 @@
   <!-- ================= MAIN CONTENT CONTAINER ================= -->
   <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
 
-    <!-- 🟢 SUPERMARKET STANDBY CALLOUT BANNER -->
-    <div id="lifeNoticeBanner" class="p-4 rounded-xl glass-card border border-emerald-500/30 flex items-start sm:items-center justify-between gap-4 text-xs sm:text-sm">
-      <div class="flex items-center space-x-3">
-        <span class="text-2xl p-2 rounded-lg bg-emerald-500/20 text-emerald-400">🛒</span>
-        <div>
-          <span class="font-semibold text-emerald-300" id="supermarketNoticeTitle">Grocery Bento Standby</span>
-          <p class="text-slate-400 mt-0.5">Ready to graduate from supermarket bentos? Discover fresh, hot takeout open right now near you tonight!</p>
-        </div>
-      </div>
-      <button onclick="document.getElementById('lifeNoticeBanner').remove()" class="text-slate-500 hover:text-slate-300 text-lg leading-none">&times;</button>
-    </div>
-
     <!-- ================= TAB 1: ROULETTE (MAIN HERO) ================= -->
     <section id="tab-roulette" class="tab-pane block space-y-6">
       
@@ -336,7 +324,7 @@
                   <option value="4000" selected>🌙 Under ¥4,000 (Realistic Takeout Cap)</option>
                   <option value="2000">🌙 Under ¥2,000 (Casual Weeknight Dinner)</option>
                   <option value="1500">🌙 Under ¥1,500 (Budget Takeout & Bowls)</option>
-                  <option value="1000">🌙 Under ¥1,000 (Supermarket Bento Alternative)</option>
+                  <option value="1000">🌙 Under ¥1,000 (Budget Takeout & Value)</option>
                   <option value="6000">🌙 Under ¥6,000 (Occasional Splurge)</option>
                   <option value="all">🌙 Any Budget (Includes Luxury ¥10k+)</option>
                 </select>
@@ -551,7 +539,6 @@
             <span class="text-slate-400">Walking circles: 300m / 500m / 800m radius</span>
           </div>
           <div class="flex items-center space-x-2">
-            <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">🛒 Supermarket Standby</span>
             <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">⭐ 3.5+ Top Tier</span>
             <span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-medium">📍 Station</span>
           </div>
@@ -607,7 +594,7 @@
         </div>
         <div class="glass-card rounded-2xl p-4 text-center">
           <div class="text-2xl font-black text-amber-400" id="statLifeEscapes">0</div>
-          <div class="text-xs text-slate-400 mt-1">Supermarket Escapes 🎉</div>
+          <div class="text-xs text-slate-400 mt-1">Repeat Orders 🔄</div>
         </div>
         <div class="glass-card rounded-2xl p-4 text-center">
           <div class="text-2xl font-black text-sky-400" id="statFavoriteCount">0</div>
@@ -2163,7 +2150,7 @@
         const unique = new Set(this.state.history.map(h => h.id)).size;
         document.getElementById('statTotalOrders').textContent = count;
         document.getElementById('statUniqueRestaurants').textContent = unique;
-        document.getElementById('statLifeEscapes').textContent = count;
+        document.getElementById('statLifeEscapes').textContent = Math.max(0, count - unique);
         document.getElementById('statFavoriteCount').textContent = this.state.favorites.length;
       }
 

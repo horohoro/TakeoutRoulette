@@ -70,16 +70,16 @@ Each restaurant's final probability $P_i$ is normalized across all eligible cont
 
 $$P_i = \frac{W_i}{\sum_{k} W_k} \times 100 \, (\%)$$
 
-### 4. 🗺️ Interactive Map & Custom Landmark Pins
+### 4. 🗺️ Interactive Map & Walking Radius Rings
 - Interactive OpenStreetMap view with custom pins.
-- Station origin pin and supermarket/transit baseline landmarks.
+- Station origin pin and proximity rings.
 - Walking radius overlay rings: **300m (~4 min)**, **500m (~6 min)**, and **800m (~10 min)**.
 - High-rated restaurants (⭐ 3.4+) highlighted with gold badges.
 
 ### 5. 📜 Order History & Bento Variety Tracker
 - Prevents dinner monotony by tracking your meal history in browser `localStorage`.
 - Record personal ratings (★1–5) and custom notes (e.g., *"Crispy karaage, great portion"*).
-- Metrics: Total Takeout Orders, Unique Spots Tried, Supermarket Escapes count.
+- Metrics: Total Takeout Orders, Unique Spots Tried, Repeat Orders count.
 
 ### 6. 📱 Cross-Device Synchronization (Phone ⇔ PC)
 - **JSON Export / Import**: Download a `.json` backup file or copy backup text to clipboard with 1 click.
