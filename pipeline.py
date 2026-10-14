@@ -34,25 +34,44 @@ class Pipeline:
 
         all_candidates: Dict[str, Dict[str, Any]] = {}
 
-        # 1. Fetch top-rated takeout spots (SrtT=rt)
-        for p in range(1, pages + 1):
+        # 1. Fetch top-rated takeout spots from station core
+        for p in range(1, max(pages, 8) + 1):
             items = self.scraper.scrape_station_page(station_conf, page=p, sort="rt")
             for item in items:
-                r_id = item["id"]
-                if r_id not in all_candidates:
-                    all_candidates[r_id] = item
+                all_candidates[item["id"]] = item
 
-        # 2. Fetch popular/high-review takeout spots (SrtT=rvcn) for everyday gems
+        # 2. Fetch popular/high-review takeout spots for everyday gems
         for p in range(1, 3):
             items_pop = self.scraper.scrape_station_page(station_conf, page=p, sort="rvcn")
             for item in items_pop:
-                r_id = item["id"]
-                if r_id not in all_candidates:
-                    all_candidates[r_id] = item
+                all_candidates[item["id"]] = item
 
-        print(f"\n[Pipeline] Discovered {len(all_candidates)} unique takeout restaurants.")
+        # 3. Fetch surrounding area spots to ensure coverage up to 1,500m
+        raw_path = station_conf.get("tabelog_area_path", "")
+        path_parts = [pt for pt in raw_path.split("/") if pt]
+        if len(path_parts) >= 3:
+            # If path ends in station code (e.g. R6076), strip to parent area (A131402)
+            area_parts = path_parts[:-1] if path_parts[-1].startswith("R") else path_parts
+            parent_area_path = "/".join(area_parts)
+            area_conf = dict(station_conf)
+            area_conf["tabelog_area_path"] = parent_area_path
+            for p in range(1, 6):
+                area_items = self.scraper.scrape_station_page(area_conf, page=p, sort="rt")
+                for item in area_items:
+                    all_candidates[item["id"]] = item
 
-        # 3. Enrich with detailed opening hours, addresses, coordinates
+            # Adjacent neighbor areas within 1,500m walking radius (e.g. A131401 Shiba/Hamamatsucho and A131403 Takanawa/Sengakuji)
+            for adj_area in ["tokyo/A1314/A131401", "tokyo/A1314/A131403"]:
+                adj_conf = dict(station_conf)
+                adj_conf["tabelog_area_path"] = adj_area
+                for p in range(1, 3):
+                    adj_items = self.scraper.scrape_station_page(adj_conf, page=p, sort="rt")
+                    for item in adj_items:
+                        all_candidates[item["id"]] = item
+
+        print(f"\n[Pipeline] Discovered {len(all_candidates)} unique takeout restaurants across up to 1,500m radius.")
+
+        # 4. Enrich with detailed opening hours, addresses, coordinates
         enriched_list = []
         candidates_list = list(all_candidates.values())
         
@@ -67,10 +86,10 @@ class Pipeline:
             else:
                 enriched = item
 
-            # Filter out places beyond 1,200m from station (comfort walking limit)
+            # Filter out places beyond 1,500m from station
             dist_m = enriched.get("distance_meters")
-            if dist_m and dist_m > 1200:
-                print(f"  Skipping {enriched['name']}: {dist_m}m is too far (>1200m)")
+            if dist_m and dist_m > 1500:
+                print(f"  Skipping {enriched['name']}: {dist_m}m is too far (>1500m)")
                 continue
 
             enriched_list.append(enriched)
